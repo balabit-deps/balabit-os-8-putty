@@ -1,0 +1,48 @@
+From a4b3e93482d4bdbef52f60f75445d3d442aedf88 Mon Sep 17 00:00:00 2001
+From: Simon Tatham <anakin@pobox.com>
+Date: Sun, 5 Apr 2020 11:20:25 +0100
+Subject: gtkfont: use PANGO_PIXELS_CEIL to work out font metrics.
+
+Colin reports that on betas of Ubuntu 20.04, Pango has switched to
+getting its font metrics from HarfBuzz, and a side effect is
+apparently that they're being returned in the full precision of
+PANGO_SCALE fixed point.
+
+Previously, Pango appears to have been returning values that were
+always a whole number of pixels scaled by PANGO_SCALE. Moreover, it
+looks as if it was rounding the font ascent and descent _up_ to a
+whole number of pixels, rather than rounding to nearest. But our code
+rounds to nearest, which means that now the same font gets allocated
+fewer vertical pixels, which can be enough to cut off some ascenders
+or descenders.
+
+Pango already provides the macro PANGO_PIXELS_CEIL, so it's easy to
+switch over to using it. This should arrange that any text that fits
+within the font's stated ascent/descent measurements will also fit in
+the character cell.
+
+Origin: upstream, https://git.tartarus.org/?p=simon/putty.git;a=commitdiff;h=f9a46a958157e1d6bd126560623599ed8ee50f32
+Last-Update: 2020-04-05
+
+Patch-Name: pango-pixels-ceil.patch
+---
+ unix/gtkfont.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/unix/gtkfont.c b/unix/gtkfont.c
+index db3dc589..21a17073 100644
+--- a/unix/gtkfont.c
++++ b/unix/gtkfont.c
+@@ -1459,8 +1459,10 @@ static unifont *pangofont_create_internal(GtkWidget *widget,
+     pfont->u.vt = &pangofont_vtable;
+     pfont->u.width =
+         PANGO_PIXELS(pango_font_metrics_get_approximate_digit_width(metrics));
+-    pfont->u.ascent = PANGO_PIXELS(pango_font_metrics_get_ascent(metrics));
+-    pfont->u.descent = PANGO_PIXELS(pango_font_metrics_get_descent(metrics));
++    pfont->u.ascent =
++        PANGO_PIXELS_CEIL(pango_font_metrics_get_ascent(metrics));
++    pfont->u.descent =
++        PANGO_PIXELS_CEIL(pango_font_metrics_get_descent(metrics));
+     pfont->u.height = pfont->u.ascent + pfont->u.descent;
+     pfont->u.want_fallback = false;
+ #ifdef DRAW_TEXT_CAIRO
